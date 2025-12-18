@@ -1,0 +1,92 @@
+---
+- name: Ensure sudo group exists
+  ansible.builtin.group:
+    name: sudo
+    state: present
+
+- name: Create users
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    groups: "{{ item.groups }}"
+    shell: "{{ item.shell }}"
+    create_home: true
+    state: present
+  loop: "{{ users }}"
+
+- name: Set up authorized keys for users
+  ansible.posix.authorized_key:
+    user: "{{ item.name }}"
+    key: "{{ item.ssh_key }}"
+    state: present
+  loop: "{{ users }}"
+
+- name: Ensure .ssh directory permissions are correct
+  ansible.builtin.file:
+    path: "/home/{{ item.name }}/.ssh"
+    state: directory
+    owner: "{{ item.name }}"
+    group: "{{ item.name }}"
+    mode: '0700'
+  loop: "{{ users }}"
+
+- name: Ensure authorized_keys permissions are correct
+  ansible.builtin.file:
+    path: "/home/{{ item.name }}/.ssh/authorized_keys"
+    owner: "{{ item.name }}"
+    group: "{{ item.name }}"
+    mode: '0600'
+  loop: "{{ users }}"
+
+- name: Test SSH key authentication for each user
+  block:
+    - name: Create temporary key files for testing
+      ansible.builtin.copy:
+        content: "{{ item.ssh_key }}"
+        dest: "/tmp/test_key_{{ item.name }}.pub"
+        mode: '0600'
+      delegate_to: localhost
+      loop: "{{ users }}"
+      changed_when: false
+
+    - name: Extract private key from Semaphore for testing (if available)
+      ansible.builtin.debug:
+        msg: "Note: SSH key test requires private keys to be available. This test will be skipped when using Semaphore Key Store."
+      when: skip_ssh_test | default(false)
+
+    - name: Try to connect with SSH key
+      ansible.builtin.command:
+        cmd: "ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no {{ item.name }}@{{ ansible_host }} 'echo SSH key login successful'"
+      delegate_to: localhost
+      loop: "{{ users }}"
+      register: ssh_test_result
+      changed_when: false
+      ignore_errors: true
+      when: not (skip_ssh_test | default(false))
+
+    - name: Display SSH test results
+      ansible.builtin.debug:
+        msg: "SSH key login for user {{ item.item.name }}: {{ 'SUCCESS' if item.rc == 0 else 'FAILED' }}"
+      loop: "{{ ssh_test_result.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when: not (skip_ssh_test | default(false))
+
+    - name: Verify all SSH key logins work
+      ansible.builtin.assert:
+        that:
+          - item.rc == 0
+        fail_msg: "SSH key login failed for user {{ item.item.name }}. Password authentication will NOT be disabled."
+        success_msg: "SSH key login verified for user {{ item.item.name }}"
+      loop: "{{ ssh_test_result.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      when: not (skip_ssh_test | default(false))
+
+    - name: Cleanup temporary key files
+      ansible.builtin.file:
+        path: "/tmp/test_key_{{ item.name }}.pub"
+        state: absent
+      delegate_to: localhost
+      loop: "{{ users }}"
+      changed_when: false
+  when: verify_ssh_keys | default(true)

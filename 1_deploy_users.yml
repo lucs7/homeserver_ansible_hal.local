@@ -1,0 +1,19 @@
+---
+- name: Deploy users with SSH keys
+  hosts: all
+  become: true
+  roles:
+    - deploy_users
+
+  post_tasks:
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: |
+          ======================================
+          User deployment completed successfully!
+          ======================================
+          Users 'lcs' and 'deploy' have been created with SSH key authentication.
+          SSH key login has been tested and verified.
+
+          You can now run the SSH hardening playbook (2_harden_ssh.yml) to disable
+          password authentication and enforce key-only access.

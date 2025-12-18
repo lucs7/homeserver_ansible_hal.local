@@ -1,0 +1,47 @@
+---
+- name: Harden SSH configuration
+  hosts: all
+  become: true
+
+  pre_tasks:
+    - name: Display warning message
+      ansible.builtin.debug:
+        msg: |
+          ======================================
+          WARNING: SSH HARDENING PLAYBOOK
+          ======================================
+          This playbook will:
+          - Disable root login
+          - Disable password authentication
+          - Require SSH key authentication only
+
+          Make sure you have run 1_deploy_users.yml first and verified
+          that SSH key login works for your users!
+
+          After this playbook runs, you will ONLY be able to login with SSH keys.
+
+    - name: Pause for confirmation
+      ansible.builtin.pause:
+        prompt: "Press ENTER to continue with SSH hardening, or Ctrl+C to abort"
+      when: require_confirmation | default(true)
+
+  roles:
+    - harden_ssh
+
+  post_tasks:
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: |
+          ======================================
+          SSH hardening completed successfully!
+          ======================================
+          SSH is now hardened with the following settings:
+          - Root login: DISABLED
+          - Password authentication: DISABLED
+          - SSH key authentication: REQUIRED
+
+          You can now only login using SSH keys for users 'lcs' and 'deploy'.
+
+          Test your connection with:
+          ssh -i ../local/id_lcs lcs@{{ ansible_host }}
+          ssh -i ../local/id_deploy deploy@{{ ansible_host }}

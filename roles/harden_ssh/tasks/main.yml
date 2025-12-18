@@ -1,0 +1,86 @@
+---
+- name: Backup original sshd_config
+  ansible.builtin.copy:
+    src: /etc/ssh/sshd_config
+    dest: /etc/ssh/sshd_config.backup.{{ ansible_date_time.iso8601_basic_short }}
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Configure SSH - Disable root login
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PermitRootLogin'
+    line: 'PermitRootLogin {{ ssh_permit_root_login }}'
+    state: present
+    validate: '/usr/sbin/sshd -t -f %s'
+  notify: Restart SSH
+
+- name: Configure SSH - Enable public key authentication
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PubkeyAuthentication'
+    line: 'PubkeyAuthentication {{ ssh_pubkey_authentication }}'
+    state: present
+    validate: '/usr/sbin/sshd -t -f %s'
+  notify: Restart SSH
+
+- name: Configure SSH - Disable password authentication
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication'
+    line: 'PasswordAuthentication {{ ssh_password_authentication }}'
+    state: present
+    validate: '/usr/sbin/sshd -t -f %s'
+  notify: Restart SSH
+
+- name: Configure SSH - Disable challenge-response authentication
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?ChallengeResponseAuthentication'
+    line: 'ChallengeResponseAuthentication {{ ssh_challenge_response_authentication }}'
+    state: present
+    validate: '/usr/sbin/sshd -t -f %s'
+  notify: Restart SSH
+
+- name: Configure SSH - Disable keyboard-interactive authentication
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?KbdInteractiveAuthentication'
+    line: 'KbdInteractiveAuthentication {{ ssh_challenge_response_authentication }}'
+    state: present
+    validate: '/usr/sbin/sshd -t -f %s'
+  notify: Restart SSH
+
+- name: Configure SSH - Disable empty passwords
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PermitEmptyPasswords'
+    line: 'PermitEmptyPasswords no'
+    state: present
+    validate: '/usr/sbin/sshd -t -f %s'
+  notify: Restart SSH
+
+- name: Configure SSH - Set maximum authentication attempts
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?MaxAuthTries'
+    line: 'MaxAuthTries 3'
+    state: present
+    validate: '/usr/sbin/sshd -t -f %s'
+  notify: Restart SSH
+
+- name: Configure SSH - Disable X11 forwarding
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?X11Forwarding'
+    line: 'X11Forwarding no'
+    state: present
+    validate: '/usr/sbin/sshd -t -f %s'
+  notify: Restart SSH
+
+- name: Verify SSH configuration
+  ansible.builtin.command:
+    cmd: /usr/sbin/sshd -t
+  changed_when: false
