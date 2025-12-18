@@ -36,3 +36,10 @@
     group: "{{ item.name }}"
     mode: '0600'
   loop: "{{ users }}"
+
+- name: Set password for deploy user
+  ansible.builtin.user:
+    name: deploy
+    password: "{{ deploy_pw | password_hash('sha512') }}"
+    update_password: always
+  when: deploy_pw is defined
